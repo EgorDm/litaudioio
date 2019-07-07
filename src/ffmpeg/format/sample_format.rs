@@ -3,7 +3,7 @@ use crate::sys::AVSampleFormat::*;
 use crate::sys::*;
 use std::str::from_utf8_unchecked;
 use litaudio::format::*;
-use litaudio::{AudioContainer, AudioStorageMut, AudioStorage};
+use litaudio::{AudioStorage};
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SampleFormat {
@@ -89,7 +89,7 @@ impl SampleFormat {
         Self::from(ret)
     }
 
-    pub fn from_storage<T, C, L, P, S>(s: &S) -> Self
+    pub fn from_storage<T, C, L, P, S>(_s: &S) -> Self
         where T: Sample, C: Dim, L: Dim, P: SamplePackingType, S: AudioStorage<T, C, L, P>
     {
         SampleFormat::from_type::<T, P>()

@@ -4,7 +4,6 @@ use litaudio::*;
 use crate::sys::*;
 use crate::ffmpeg::*;
 use crate::error::Error;
-use std::marker::PhantomData;
 
 pub struct Input {
 	format_ctx: FormatContext,
