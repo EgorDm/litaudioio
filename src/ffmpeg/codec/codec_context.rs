@@ -24,7 +24,10 @@ impl CodecContext {
 	}
 
 	pub fn channel_layout(&self) -> ChannelLayout {
-		ChannelLayout::from_bits_truncate(self.as_ref().channel_layout)
+		match self.as_ref().channel_layout {
+			0 => ChannelLayout::default(self.as_ref().channels),
+			_ => ChannelLayout::from_bits_truncate(self.as_ref().channel_layout)
+		}
 	}
 
 	pub fn set_channel_layout(&mut self, channel_layout: ChannelLayout) {
