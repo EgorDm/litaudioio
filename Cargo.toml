@@ -1,5 +1,5 @@
 [package]
-name = "litio"
+name = "litaudioio"
 version = "0.1.0"
 authors = ["Egor Dmitriev <egordmitriev2@gmail.com>"]
 edition = "2018"
