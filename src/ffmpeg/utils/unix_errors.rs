@@ -107,7 +107,7 @@ pub fn unix_err_to_string(value: c_int) -> &'static str {
 		v if v == ENETRESET => "Network dropped connection because of reset",
 		v if v == ECONNABORTED => "Software caused connection abort",
 		v if v == ECONNRESET => "Connection reset by peer",
-		v if v == ENOBUFS => "No x space available",
+		v if v == ENOBUFS => "No buffer space available",
 		v if v == EISCONN => "Transport endpoint is already connected",
 		v if v == ENOTCONN => "Transport endpoint is not connected",
 		v if v == ESHUTDOWN => "Cannot send after transport endpoint shutdown",
