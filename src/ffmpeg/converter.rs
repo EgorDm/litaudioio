@@ -9,7 +9,9 @@ use litcontainers::*;
 use litaudio::*;
 
 pub struct Converter {
-	ptr: *mut SwrContext
+	ptr: *mut SwrContext,
+	src_channel_ptrs: Vec<*const u8>,
+	dst_channel_ptrs: Vec<*mut u8>,
 }
 
 impl Converter {
@@ -26,7 +28,20 @@ impl Converter {
 			}
 
 			ffm_op!(swr_init(ptr))?;
-			Ok(Converter { ptr })
+			let src_ch_ptr_count = match src_fmt.sample_format.is_planar() {
+				true => src_fmt.channel_layout.channels() as usize,
+				false => 1,
+			};
+			let dst_ch_ptr_count = match dst_fmt.sample_format.is_planar() {
+				true => dst_fmt.channel_layout.channels() as usize,
+				false => 1,
+			};
+
+			Ok(Converter {
+				ptr,
+				src_channel_ptrs: vec![ptr::null(); src_ch_ptr_count],
+				dst_channel_ptrs: vec![ptr::null_mut(); dst_ch_ptr_count],
+			})
 		}
 	}
 
@@ -38,9 +53,13 @@ impl Converter {
 		where T: Sample, C: Dim, CS: Dim, L: Dim, LS: Dim, P: SamplePackingType
 	{
 		unsafe {
+			for i in 0..self.dst_channel_ptrs.len() {
+				self.dst_channel_ptrs[i] = mem::transmute(output.as_channel_mut_ptr(i));
+			}
+
 			self.convert(
 				mem::transmute((*input.as_ptr()).data.as_ptr()), input.nb_samples(),
-				mem::transmute(output.as_mut_ptr()), output.sample_count() as i32
+				self.dst_channel_ptrs.as_ptr(), output.sample_count() as i32 // TODO: point to array of pointers
 			)
 		}
 	}
@@ -49,8 +68,12 @@ impl Converter {
 		where T: Sample, C: Dim, CS: Dim, L: Dim, LS: Dim, P: SamplePackingType
 	{
 		unsafe {
+			for i in 0..self.src_channel_ptrs.len() {
+				self.src_channel_ptrs[i] = mem::transmute(input.as_channel_ptr(i));
+			}
+
 			self.convert(
-				mem::transmute(input.as_ptr()), input.sample_count() as i32,
+				self.src_channel_ptrs.as_ptr(), input.sample_count() as i32,
 				mem::transmute((*output.as_mut_ptr()).data.as_ptr()), output.nb_samples(),
 			)
 		}
