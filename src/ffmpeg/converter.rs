@@ -49,31 +49,31 @@ impl Converter {
 		unsafe { swr_get_out_samples(self.ptr, input_sample_count) }
 	}
 
-	pub fn convert_frame<'a, T, C, CS, L, LS, P>(&mut self, input: &mut Frame, output: &mut AudioSliceMut<'a, T, C, CS, L, LS, P>) -> Result<i32, Error>
-		where T: Sample, C: Dim, CS: Dim, L: Dim, LS: Dim, P: SamplePackingType
+	pub fn convert_frame<'a, T, C, CS, L, LS>(&mut self, input: &mut Frame, output: &mut SliceMut<'a, T, C, CS, L, LS>) -> Result<i32, Error>
+		where T: Sample, C: Dim, CS: Dim, L: Dim, LS: Dim
 	{
 		unsafe {
 			for i in 0..self.dst_channel_ptrs.len() {
-				self.dst_channel_ptrs[i] = mem::transmute(output.as_channel_mut_ptr(i));
+				self.dst_channel_ptrs[i] = mem::transmute(output.as_row_ptr_mut(i));
 			}
 
 			self.convert(
 				mem::transmute((*input.as_ptr()).data.as_ptr()), input.nb_samples(),
-				self.dst_channel_ptrs.as_ptr(), output.sample_count() as i32 // TODO: point to array of pointers
+				self.dst_channel_ptrs.as_ptr(), output.cols() as i32 // TODO: point to array of pointers
 			)
 		}
 	}
 
-	pub fn convert_slice<'a, T, C, CS, L, LS, P>(&mut self, input: &AudioSlice<'a, T, C, CS, L, LS, P>, output: &mut Frame) -> Result<i32, Error>
-		where T: Sample, C: Dim, CS: Dim, L: Dim, LS: Dim, P: SamplePackingType
+	pub fn convert_slice<'a, T, C, CS, L, LS>(&mut self, input: &Slice<'a, T, C, CS, L, LS>, output: &mut Frame) -> Result<i32, Error>
+		where T: Sample, C: Dim, CS: Dim, L: Dim, LS: Dim
 	{
 		unsafe {
 			for i in 0..self.src_channel_ptrs.len() {
-				self.src_channel_ptrs[i] = mem::transmute(input.as_channel_ptr(i));
+				self.src_channel_ptrs[i] = mem::transmute(input.as_row_ptr(i));
 			}
 
 			self.convert(
-				self.src_channel_ptrs.as_ptr(), input.sample_count() as i32,
+				self.src_channel_ptrs.as_ptr(), input.cols() as i32,
 				mem::transmute((*output.as_mut_ptr()).data.as_ptr()), output.nb_samples(),
 			)
 		}

@@ -10,11 +10,11 @@ pub struct AudioFormat {
 }
 
 impl AudioFormat {
-	pub fn from_storage<T, C, L, P, S>(s: &S) -> Self
-		where T: Sample, C: Dim, L: Dim, P: SamplePackingType, S: AudioStorage<T, C, L, P>
+	pub fn from_storage<T, P, S>(s: &S) -> Self
+		where T: Sample, P: SamplePackingType, S: AudioStorage<T, P>
 	{
 		AudioFormat {
-			channel_layout: ChannelLayout::default(s.channel_count() as i32),
+			channel_layout: ChannelLayout::default(s.channels() as i32),
 			sample_format: SampleFormat::from_storage(s),
 			sample_rate: s.sample_rate()
 		}

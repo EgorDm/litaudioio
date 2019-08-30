@@ -17,20 +17,20 @@ use reader::*;
 use writer::*;
 use error::*;
 use std::path::Path;
-use litcontainers::StorageConstructor;
+use litcontainers::{StorageConstructor, Container, StorageMut};
 
-pub fn read_audio<T, C, P, S>(path: &Path) -> Result<AudioContainer<T, C, Dynamic, P, S>, Error>
-	where T: Sample, C: Dim, P: SamplePackingType, S: AudioStorageMut<T, C, Dynamic, P> + DynamicSampleStorage<T, C> + StorageConstructor<T, C, Dynamic>
+pub fn read_audio<T, P, S>(path: &Path) -> Result<Container<T, AudioContainer<T, P, S>>, Error>
+	where T: Sample, P: SamplePackingType, S: StorageMut<T> + DynamicSampleStorage<T> + StorageConstructor<T>
 {
 	let path = match path.to_str() {
 		None => return Err(Error::from(format!("Invalid path: {}", path.display()))),
 		Some(s) => s
 	};
-	Reader::open(&path, None)?.read()
+	Reader::open(&path, None)?.read().map(|v| v.into())
 }
 
-pub fn write_audio<S, T, C, L, P>(path: &Path, audio: &S) -> Result<(), Error>
-	where T: Sample, C: Dim, L: Dim, P: SamplePackingType, S: AudioStorage<T, C, L, P>
+pub fn write_audio<S, T, P>(path: &Path, audio: &S) -> Result<(), Error>
+	where T: Sample, P: SamplePackingType, S: AudioStorage<T, P>
 {
 	let path = match path.to_str() {
 		None => return Err(Error::from(format!("Invalid path: {}", path.display()))),

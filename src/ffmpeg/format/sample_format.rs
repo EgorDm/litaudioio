@@ -4,6 +4,7 @@ use crate::sys::*;
 use std::str::from_utf8_unchecked;
 use litaudio::format::*;
 use litaudio::{AudioStorage};
+use litcontainers::ScalarType;
 
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum SampleFormat {
@@ -32,15 +33,15 @@ impl SampleFormat {
     }
 
     #[inline]
-    pub fn sample_type(&self) -> Option<SampleType> {
+    pub fn sample_type(&self) -> Option<ScalarType> {
         match self {
             SampleFormat::None => None,
-            SampleFormat::U8(_) => Some(SampleType::UInt8),
-            SampleFormat::I16(_) => Some(SampleType::Int16),
-            SampleFormat::I32(_) => Some(SampleType::Int32),
-            SampleFormat::I64(_) => Some(SampleType::Int64),
-            SampleFormat::F32(_) => Some(SampleType::Float),
-            SampleFormat::F64(_) => Some(SampleType::Double),
+            SampleFormat::U8(_) => Some(ScalarType::U8),
+            SampleFormat::I16(_) => Some(ScalarType::I16),
+            SampleFormat::I32(_) => Some(ScalarType::I32),
+            SampleFormat::I64(_) => Some(ScalarType::I64),
+            SampleFormat::F32(_) => Some(ScalarType::F32),
+            SampleFormat::F64(_) => Some(ScalarType::F64),
         }
     }
 
@@ -72,16 +73,17 @@ impl SampleFormat {
     pub fn from_type<T, P>() -> Self
         where T: Sample, P: SamplePackingType
     {
-        let mut ret = match T::get_sample_type() {
-            SampleType::Float => AV_SAMPLE_FMT_FLT,
-            SampleType::Double => AV_SAMPLE_FMT_DBL,
-            SampleType::UInt8 => AV_SAMPLE_FMT_U8,
-            SampleType::Int16 => AV_SAMPLE_FMT_S16,
-            SampleType::Int32 => AV_SAMPLE_FMT_S32,
-            SampleType::Int64 => AV_SAMPLE_FMT_S64
+        let mut ret = match T::scalar_type() {
+            ScalarType::F32 => AV_SAMPLE_FMT_FLT,
+            ScalarType::F64 => AV_SAMPLE_FMT_DBL,
+            ScalarType::U8 => AV_SAMPLE_FMT_U8,
+            ScalarType::I16 => AV_SAMPLE_FMT_S16,
+            ScalarType::I32 => AV_SAMPLE_FMT_S32,
+            ScalarType::I64 => AV_SAMPLE_FMT_S64,
+            _ => AV_SAMPLE_FMT_NONE
         };
 
-        ret = match P::get_packing_type() {
+        ret = match P::packing_type() {
             SamplePacking::Deinterleaved => unsafe { av_get_planar_sample_fmt(ret) },
             SamplePacking::Interleaved => ret,
         };
@@ -89,8 +91,8 @@ impl SampleFormat {
         Self::from(ret)
     }
 
-    pub fn from_storage<T, C, L, P, S>(_s: &S) -> Self
-        where T: Sample, C: Dim, L: Dim, P: SamplePackingType, S: AudioStorage<T, C, L, P>
+    pub fn from_storage<T, P, S>(_s: &S) -> Self
+        where T: Sample, P: SamplePackingType, S: AudioStorage<T, P>
     {
         SampleFormat::from_type::<T, P>()
     }

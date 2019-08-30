@@ -57,18 +57,18 @@ impl Input {
 	}
 }
 
-pub struct Reader<'a, T, C, P, S>
-	where T: Sample, C: Dim, P: SamplePackingType, S: AudioStorageMut<T, C, Dynamic, P> + DynamicSampleStorage<T, C> + StorageConstructor<T, C, Dynamic>
+pub struct Reader<'a, T, P, S>
+	where T: Sample, P: SamplePackingType, S: StorageMut<T> + DynamicSampleStorage<T> + StorageConstructor<T>
 {
 	input: Input,
-	output: AudioContainer<T, C, Dynamic, P, S>,
-	cursor: AudioSliceMut<'a, T, C, S::RStride, Dynamic, S::CStride, P>,
+	output: AudioContainer<T, P, S>,
+	cursor: SliceMut<'a, T, S::Rows, S::RowStride, Dynamic, S::ColStride>,
 	converter: Option<Converter>,
 	sample_count: usize
 }
 
-impl<'a, T, C, P, S> Reader<'a, T, C, P, S>
-	where T: Sample, C: Dim, P: SamplePackingType, S: AudioStorageMut<T, C, Dynamic, P> + DynamicSampleStorage<T, C> + StorageConstructor<T, C, Dynamic>
+impl<'a, T, P, S> Reader<'a, T, P, S>
+	where T: Sample, P: SamplePackingType, S: StorageMut<T> + DynamicSampleStorage<T> + StorageConstructor<T>
 {
 	pub fn open(path: &str, channel_count: Option<usize>) -> Result<Self, Error> {
 		let input = Input::open(
@@ -76,15 +76,14 @@ impl<'a, T, C, P, S> Reader<'a, T, C, P, S>
 			|i| pick_best_format(i, SampleFormat::from_type::<T, P>())
 		)?;
 
-		let channel_count = match (channel_count, C::try_to_usize()) {
-			(None, None) => C::from_usize(input.channel_layout().channels() as usize),
-			(Some(c), None) => C::from_usize(c),
-			(_, Some(c)) => C::from_usize(c),
+		let channel_count = match (channel_count, S::Rows::try_to_usize()) {
+			(None, None) => S::Rows::from_usize(input.channel_layout().channels() as usize),
+			(Some(c), None) => S::Rows::from_usize(c),
+			(_, Some(c)) => S::Rows::from_usize(c),
 		};
 
 		let mut output = AudioContainer::zeros(
-			channel_count,
-			Dynamic::new(input.estimated_sample_count())
+			Size::new(channel_count, D!(input.estimated_sample_count()))
 		);
 		output.set_sample_rate(input.sample_rate());
 
@@ -96,15 +95,19 @@ impl<'a, T, C, P, S> Reader<'a, T, C, P, S>
 			true => Some(input.converter(AudioFormat::from_storage(&output))?)
 		};
 
-		let cursor = AudioSliceMut::new(
-			unsafe {AudioPtrMutStorage::new(std::ptr::null_mut(), channel_count, Dynamic::new(0), output.channel_stride_dim(), output.sample_stride_dim())},
-			output.sample_rate()
-		);
+		let cursor = SliceBase::new(
+			unsafe {
+				PtrStorageMut::new(
+					std::ptr::null_mut(),
+					Size::new(channel_count, Dynamic::new(0)),
+					output.strides()
+				)},
+		).into();
 
 		Ok(Reader { input, output, cursor, converter, sample_count: 0 })
 	}
 
-	pub fn read(mut self) -> Result<AudioContainer<T, C, Dynamic, P, S>, Error> {
+	pub fn read(mut self) -> Result<AudioContainer<T, P, S>, Error> {
 		let mut frame = Frame::empty().unwrap();
 		let mut packet = Packet::empty();
 
@@ -115,7 +118,7 @@ impl<'a, T, C, P, S> Reader<'a, T, C, P, S>
 			Ok(_) => true
 		} {}
 
-		self.output.resize_sample_count(self.sample_count);
+		self.output.set_samples(self.sample_count);
 		Ok(self.output)
 	}
 
@@ -138,12 +141,12 @@ impl<'a, T, C, P, S> Reader<'a, T, C, P, S>
 			Err(e) => return Err(e),
 			_ => true
 		} {
-			if self.output.sample_count() < self.sample_count + frame.nb_samples() as usize {
-				self.output.resize_sample_count(self.sample_count + frame.nb_samples() as usize);
+			if self.output.samples() < self.sample_count + frame.nb_samples() as usize {
+				self.output.set_samples(self.sample_count + frame.nb_samples() as usize);
 			}
 
-			let buffer_size = self.output.sample_count() - self.sample_count;
-			self.cursor.shift_sample_to(&mut self.output, self.sample_count, buffer_size);
+			let buffer_size = self.output.samples() - self.sample_count;
+			self.cursor.storage_mut().storage_mut().shift_col_to(&mut self.output, self.sample_count, buffer_size);
 
 			self.copy_frame_to_cursor(frame)?;
 
@@ -156,22 +159,22 @@ impl<'a, T, C, P, S> Reader<'a, T, C, P, S>
 	pub fn copy_frame_to_cursor(&mut self, frame: &mut Frame) -> Result<(), Error> {
 		match self.converter {
 			None => {
-				match self.cursor.sample_packing() {
+				match self.output.packing_type() {
 					SamplePacking::Interleaved => {
 						unsafe {
 							ptr::copy_nonoverlapping(
 								frame.data_ptr(0) as *const T,
-								self.cursor.as_channel_mut_ptr(0),
-								(frame.nb_samples() as usize) * self.cursor.channel_count()
+								self.cursor.as_row_ptr_mut(0),
+								(frame.nb_samples() as usize) * self.cursor.rows()
 							);
 						}
 					},
 					SamplePacking::Deinterleaved => {
-						for c in 0..self.cursor.channel_count() {
+						for c in 0..self.cursor.rows() {
 							unsafe {
 								ptr::copy_nonoverlapping(
 									frame.data_ptr(c) as *const T,
-									self.cursor.as_channel_mut_ptr(c),
+									self.cursor.as_row_ptr_mut(c),
 									frame.nb_samples() as usize
 								);
 							}
