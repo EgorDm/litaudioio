@@ -16,7 +16,7 @@ fn main() {
 }
 
 fn remux(in_path: &Path, out_path: &Path) {
-	let s: Result<AudioDeinterleaved<f32, U2, Dynamic>, litaudioio::error::Error> = read_audio(in_path);
+	let s: Result<AudioDeinterleavedC<f32, U2, Dynamic>, litaudioio::error::Error> = read_audio(in_path);
 
 	match s {
 		Ok(s) => {
